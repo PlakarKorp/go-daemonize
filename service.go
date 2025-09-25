@@ -26,12 +26,31 @@ import (
 	"github.com/PlakarKorp/go-daemonize/logging"
 )
 
+type key int
+
+const serviceProviderKey key = 0
+
+func GetServiceProvider(ctx context.Context) ServiceProvider {
+	return ctx.Value(serviceProviderKey).(ServiceProvider)
+}
+
+func GetService(ctx context.Context, name string) Service {
+	return GetServiceProvider(ctx).GetService(name)
+}
+
+type ServiceProvider interface {
+	GetService(string) Service
+}
+
 type Service interface {
 	Start(ctx context.Context) error
 	Shutdown(ctx context.Context) error
 }
 
 func (daemon *Daemon) Run(ctx context.Context) {
+
+	ctx = context.WithValue(ctx, serviceProviderKey, daemon)
+
 	logging.GetLogger(ctx).Info("starting")
 	for name, service := range daemon.services {
 		daemon.startService(ctx, name, service)
@@ -55,6 +74,10 @@ func (daemon *Daemon) AddService(name string, svc Service) {
 		daemon.services = make(map[string]Service)
 	}
 	daemon.services[name] = svc
+}
+
+func (daemon *Daemon) GetService(name string) Service {
+	return daemon.services[name]
 }
 
 func (daemon *Daemon) startService(ctx context.Context, name string, svc Service) {
