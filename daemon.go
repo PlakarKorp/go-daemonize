@@ -136,13 +136,13 @@ func (daemon *Daemon) setUp() {
 
 	// Setup logging
 	if opt_logFile != "" {
-		logger, err := logging.NewFile(opt_logFile)
+		logger, err := logging.NewFileLogger(opt_logFile)
 		if err != nil {
 			logging.Fatal("cannot open log file: %v", err)
 		}
 		logging.SetDefaultLogger(logger)
 	} else if !opt_foreground {
-		logger, err := logging.NewSyslog(syslog.LOG_INFO|syslog.LOG_USER, daemon.logTag)
+		logger, err := logging.NewSyslogLogger(syslog.LOG_INFO|syslog.LOG_USER, daemon.logTag)
 		if err != nil {
 			logging.Fatal("cannot open syslog: %v", err)
 		}
