@@ -17,7 +17,9 @@
 package logging
 
 import (
+	"bytes"
 	"context"
+	"time"
 )
 
 type LogLevel int
@@ -32,13 +34,25 @@ const (
 	ALL
 )
 
+type LogEntry struct {
+	Timestamp time.Time
+	Level     LogLevel
+	Message   string
+	Args      []any
+}
+
+type LogFormatter interface {
+	FormatLog(*bytes.Buffer, *LogEntry)
+}
+
 type Logger interface {
-	SetLevel(level LogLevel)
-	Debug(format string, args ...any)
-	Info(format string, args ...any)
-	Warn(format string, args ...any)
-	Error(format string, args ...any)
-	Fatal(format string, args ...any)
+	WithLevel(LogLevel) Logger
+	WithFormatter(LogFormatter) Logger
+	Debug(string, ...any)
+	Info(string, ...any)
+	Warn(string, ...any)
+	Error(string, ...any)
+	Fatal(string, ...any)
 }
 
 var defaultLogger Logger = NewDefaultLogger()
@@ -49,10 +63,6 @@ func SetDefaultLogger(logger Logger) {
 
 func GetDefaultLogger() Logger {
 	return defaultLogger
-}
-
-func SetLevel(level LogLevel) {
-	defaultLogger.SetLevel(level)
 }
 
 func Debug(format string, args ...any) {

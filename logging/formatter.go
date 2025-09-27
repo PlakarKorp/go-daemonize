@@ -17,13 +17,30 @@
 package logging
 
 import (
-	"log/syslog"
+	"bytes"
+	"fmt"
 )
 
-func NewSyslogLogger(priority syslog.Priority, tag string) (Logger, error) {
-	writer, err := syslog.New(priority, tag)
-	if err != nil {
-		return nil, err
+var logLevelToString = map[LogLevel]string{
+	FATAL: "FATAL",
+	ERROR: "ERROR",
+	WARN:  "WARN",
+	INFO:  "INFO",
+	DEBUG: "DEBUG",
+}
+
+type DefaultFormatter struct{}
+
+func (formatter *DefaultFormatter) FormatLog(buf *bytes.Buffer, entry *LogEntry) {
+	strLevel, ok := logLevelToString[entry.Level]
+	if !ok {
+		strLevel = "???"
 	}
-	return NewWriterLogger(writer, false), nil
+	buf.WriteString(strLevel)
+	buf.WriteString(": ")
+	if len(entry.Args) == 0 {
+		buf.WriteString(entry.Message)
+	} else {
+		fmt.Fprintf(buf, entry.Message, entry.Args...)
+	}
 }
