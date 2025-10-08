@@ -23,7 +23,6 @@ import (
 	"log/syslog"
 	"os"
 	"path/filepath"
-	"sync"
 	"syscall"
 
 	"github.com/PlakarKorp/go-daemonize/logging"
@@ -40,8 +39,7 @@ type Daemon struct {
 	config  Configuration
 	isDebug bool
 
-	wg       sync.WaitGroup
-	services map[string]Service
+	services map[string]*ServiceController
 }
 
 type Option func(*Daemon)
