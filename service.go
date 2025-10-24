@@ -24,12 +24,14 @@ import (
 	"os/signal"
 	"sync"
 	"syscall"
+	"time"
 
 	"github.com/PlakarKorp/go-daemonize/logging"
 )
 
 type ServiceProvider interface {
 	GetService(string) Service
+	GetServiceStatus(string) (ServiceStatus, bool)
 }
 
 type Service interface {
@@ -39,10 +41,11 @@ type Service interface {
 type ServiceStatus string
 
 const (
-	ServiceDown     ServiceStatus = "down"
+	ServiceInit     ServiceStatus = "initialized"
 	ServiceStarting ServiceStatus = "starting"
 	ServiceUp       ServiceStatus = "up"
 	ServiceStopping ServiceStatus = "stopping"
+	ServiceDown     ServiceStatus = "down"
 )
 
 type ServiceController struct {
@@ -96,7 +99,7 @@ func (daemon *Daemon) AddService(name string, service Service) {
 	daemon.services[name] = &ServiceController{
 		name:    name,
 		service: service,
-		status:  ServiceDown,
+		status:  ServiceInit,
 		mu:      sync.Mutex{},
 	}
 }
@@ -109,10 +112,18 @@ func (daemon *Daemon) GetService(name string) Service {
 	return ctrl.service
 }
 
+func (daemon *Daemon) GetServiceStatus(name string) (ServiceStatus, bool) {
+	ctrl, found := daemon.services[name]
+	if !found {
+		return "", found
+	}
+	return ctrl.status, true
+}
+
 func (ctrl *ServiceController) startService(ctx context.Context, wg *sync.WaitGroup) error {
 	ctrl.ctx = ctx
 	ctrl.mu.Lock()
-	if ctrl.status != ServiceDown {
+	if ctrl.status != ServiceInit {
 		err := fmt.Errorf("service is %s", ctrl.status)
 		ctrl.mu.Unlock()
 		return err
@@ -145,6 +156,33 @@ func (ctrl *ServiceController) stopService() {
 	if ctrl.stop != nil {
 		ctrl.stop(Stopped)
 		ctrl.stop = nil
+	}
+}
+
+func (ctrl *ServiceController) WaitService(name string) error {
+	// Wait for the given service to be up
+	p := GetServiceProvider(ctrl.ctx)
+	if p == nil {
+		return fmt.Errorf("%s: no service provider", ctrl.name)
+	}
+
+	for {
+		status, found := p.GetServiceStatus(name)
+		if !found {
+			return fmt.Errorf("%s: unknown service %q", ctrl.name, name)
+		}
+
+		switch status {
+		case ServiceInit:
+			fallthrough
+		case ServiceStarting:
+			time.Sleep(100 * time.Millisecond)
+			continue
+		case ServiceUp:
+			return nil
+		default:
+			return fmt.Errorf("%s: service %q is %s", ctrl.name, name, status)
+		}
 	}
 }
 
